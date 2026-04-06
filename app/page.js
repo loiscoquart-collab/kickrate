@@ -122,7 +122,7 @@ export default function Home() {
       comment: modalComment
     })
     setModal(null); setModalStars(0); setModalComment('')
-    fetchAllRatings()
+await fetchAllRatings()
   }
 
   async function addFriend(friendUsername) {
