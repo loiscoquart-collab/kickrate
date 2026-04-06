@@ -388,12 +388,7 @@ export default function Home() {
 
       {tab==='matches' && (
   <div>
-    {/* AJOUTE CE DEBUG ICI */}
-    <div style={{background:'#f0f0f0',padding:8,marginBottom:12,fontSize:12}}>
-      <strong>Debug:</strong> Total matchs: {matches.length} | 
-      Football: {matches.filter(m => m.sport === 'Football').length} |
-      Basket: {matches.filter(m => m.sport === 'Basket').length}
-    </div>
+    
     
     <div style={{display:'flex',gap:6,marginBottom:12}}>
       {['Tous','Football','Basket','F1','Tennis'].map(s=>(
