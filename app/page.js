@@ -23,8 +23,9 @@ export default function Home() {
       setUser(data.session?.user ?? null)
     })
     supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ?? null)
-    })
+  setUser(session?.user ?? null)
+  if (session?.user) fetchProfile()
+})
     fetchMatches()
     fetchAllRatings()
 
@@ -89,13 +90,18 @@ export default function Home() {
     if (authMode === 'signup') {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (!error && data.user) {
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          username,
-          avatar_initials: username.slice(0, 2).toUpperCase()
-        })
-      }
-      alert(error ? error.message : 'Compte créé ! Vérifie tes emails.')
+  const { error: profileError } = await supabase.from('profiles').insert({
+    id: data.user.id,
+    username,
+    avatar_initials: username.slice(0, 2).toUpperCase()
+  })
+  if (profileError) {
+    alert('Erreur création profil : ' + profileError.message)
+    setLoading(false)
+    return
+  }
+}
+alert(error ? error.message : 'Compte créé ! Vérifie tes emails.')
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) alert(error.message)
@@ -122,7 +128,8 @@ export default function Home() {
       comment: modalComment
     })
     setModal(null); setModalStars(0); setModalComment('')
-await fetchAllRatings()
+fetchAllRatings()
+fetchMatches()
   }
 
   async function addFriend(friendUsername) {
