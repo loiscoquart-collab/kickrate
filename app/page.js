@@ -387,12 +387,25 @@ export default function Home() {
       </div>
 
       {tab==='matches' && (
-        <div>
-          <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-            {['Tous','Football','Basket','Tennis','Rugby'].map(s=>(
-              <button key={s} onClick={()=>setSportFilter(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:sportFilter===s?'#000':'transparent',color:sportFilter===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>{s}</button>
-            ))}
-          </div>
+  <div>
+    {/* AJOUTE CE DEBUG ICI */}
+    <div style={{background:'#f0f0f0',padding:8,marginBottom:12,fontSize:12}}>
+      <strong>Debug:</strong> Total matchs: {matches.length} | 
+      Football: {matches.filter(m => m.sport === 'Football').length} |
+      Basket: {matches.filter(m => m.sport === 'Basket').length}
+    </div>
+    
+    <div style={{display:'flex',gap:6,marginBottom:12}}>
+      {['Tous','Football','Basket','F1','Tennis'].map(s=>(
+        <button key={s} onClick={()=>setSportFilter(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:sportFilter===s?'#000':'transparent',color:sportFilter===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>
+          {s}
+        </button>
+      ))}
+    </div>
+    {/* FIN DEBUG */}
+    
+    <p style={{fontSize:12,color:'#aaa',marginBottom:12}}>Clique sur un match pour le noter</p>
+    {/* ... reste du code ... */}
           {filteredMatches.length===0&&<p style={{color:'#aaa',fontSize:14}}>Aucun match.</p>}
           {filteredMatches.map(m=>{
             const myRating = getMyRating(m.id)
