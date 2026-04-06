@@ -18,16 +18,17 @@ export async function GET() {
       )
       const data = await res.json()
       if (data.matches) {
-        allMatches.push(...data.matches.map(m => ({
-          id: String(m.id),
-          teams: `${m.homeTeam.shortName} — ${m.awayTeam.shortName}`,
-          score: m.score?.fullTime?.home !== null
-            ? `${m.score.fullTime.home} - ${m.score.fullTime.away}`
-            : 'À venir',
-          league: data.competition?.name || comp,
-          date: m.utcDate?.slice(0, 10) || ''
-        })))
-      }
+  allMatches.push(...data.matches.map(m => ({
+    id: String(m.id),
+    teams: `${m.homeTeam.shortName} — ${m.awayTeam.shortName}`,
+    score: m.score?.fullTime?.home !== null
+      ? `${m.score.fullTime.home} - ${m.score.fullTime.away}`
+      : 'À venir',
+    league: data.competition?.name || comp,
+    date: m.utcDate?.slice(0, 10) || '',
+    sport: 'Football'   // <----- AJOUTE CETTE LIGNE ICI
+  })))
+}
     } catch (e) {}
   }
 
