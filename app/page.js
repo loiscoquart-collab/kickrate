@@ -34,6 +34,7 @@ export default function Home() {
   const [chatFriend, setChatFriend] = useState(null)
   const [chatText, setChatText] = useState('')
   const [now, setNow] = useState(Date.now())
+  const [sportFilter, setSportFilter] = useState('Tous')
   const chatBottomRef = useRef(null)
 
   useEffect(() => {
@@ -246,6 +247,8 @@ export default function Home() {
     return r
   }
 
+  const filteredMatches = sportFilter === 'Tous' ? matches : matches.filter(m => m.sport === sportFilter)
+
   const SortBar = ({ value, onChange }) => (
     <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
       {['recent','ancien','meilleures','mauvaises'].map(s => (
@@ -347,9 +350,16 @@ export default function Home() {
 
       {tab==='matches' && (
         <div>
+          <div style={{display:'flex',gap:6,marginBottom:12}}>
+            {['Tous','Football','Basket'].map(s=>(
+              <button key={s} onClick={()=>setSportFilter(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:sportFilter===s?'#000':'transparent',color:sportFilter===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>
+                {s}
+              </button>
+            ))}
+          </div>
           <p style={{fontSize:12,color:'#aaa',marginBottom:12}}>Clique sur un match pour le noter</p>
-          {matches.length===0&&<p style={{color:'#aaa',fontSize:14}}>Chargement des matchs...</p>}
-          {matches.map(m=>{
+          {filteredMatches.length===0&&<p style={{color:'#aaa',fontSize:14}}>Aucun match.</p>}
+          {filteredMatches.map(m=>{
             const mRatings=getMatchRatings(m.id)
             const myRating=getMyRating(m.id)
             const avg=mRatings.length?(mRatings.reduce((a,r)=>a+r.stars,0)/mRatings.length).toFixed(1):null
@@ -438,7 +448,7 @@ export default function Home() {
               <p style={{fontSize:13,fontWeight:500,marginBottom:12}}>Chat avec @{chatFriend.profiles?.username}</p>
               <div style={{border:'0.5px solid #ddd',borderRadius:12,padding:'1rem',marginBottom:12,minHeight:300,maxHeight:400,overflowY:'auto',display:'flex',flexDirection:'column',gap:8}}>
                 {getChatMessages().length===0&&<p style={{color:'#aaa',fontSize:13,textAlign:'center',marginTop:'auto'}}>Commencez à chatter !</p>}
-                {getChatMessages().map(m=>(
+                                {getChatMessages().map(m=>(
                   <div key={m.id} style={{display:'flex',flexDirection:'column',alignItems:m.from_user_id===user.id?'flex-end':'flex-start'}}>
                     {m.content&&(
                       <div style={{background:m.from_user_id===user.id?'#000':'#f5f5f5',color:m.from_user_id===user.id?'#fff':'#333',padding:'8px 12px',borderRadius:12,maxWidth:'80%',fontSize:13}}>

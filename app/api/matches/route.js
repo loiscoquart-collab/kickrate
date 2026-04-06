@@ -9,6 +9,7 @@ export async function GET() {
   const competitions = ['PL', 'FL1', 'BL1', 'PD', 'SA']
   const allMatches = []
 
+  // Récupération des matchs de football
   for (const comp of competitions) {
     try {
       const res = await fetch(
@@ -29,6 +30,25 @@ export async function GET() {
       }
     } catch (e) {}
   }
+
+  // Récupération des matchs de basket NBA
+  try {
+    const basketRes = await fetch(
+      `https://api.balldontlie.io/v1/games?start_date=${fmt(dateFrom)}&end_date=${fmt(dateTo)}`,
+      { headers: { 'Authorization': process.env.BALLDONTLIE_API_KEY } }
+    )
+    const basketData = await basketRes.json()
+    if (basketData.data) {
+      allMatches.push(...basketData.data.slice(0,5).map(m => ({
+        id: 'basket-' + m.id,
+        teams: `${m.home_team.full_name} — ${m.visitor_team.full_name}`,
+        score: `${m.home_team_score} - ${m.visitor_team_score}`,
+        league: 'NBA',
+        date: m.date?.slice(0,10),
+        sport: 'Basket'
+      })))
+    }
+  } catch (e) {}
 
   allMatches.sort((a, b) => b.date.localeCompare(a.date))
   return Response.json(allMatches)
