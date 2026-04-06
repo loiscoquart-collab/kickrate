@@ -197,9 +197,19 @@ export default function Home() {
   }
 
   async function declineFriend(requestId) {
-    await supabase.from('friendships').delete().eq('id', requestId)
-    fetchPendingRequests()
-  }
+  await supabase.from('friendships').delete().eq('id', requestId)
+  fetchPendingRequests()
+  fetchFriendFeed()
+}
+
+async function removeFriend(friendId) {
+  if (!confirm('Supprimer cet ami ?')) return
+  await supabase.from('friendships').delete()
+    .eq('user_id', user.id).eq('friend_id', friendId)
+  await supabase.from('friendships').delete()
+    .eq('user_id', friendId).eq('friend_id', user.id)
+  fetchFriendFeed()
+}
 
   function getMatchRatings(matchId) {
     return ratings.filter(r => r.match_id === matchId)
@@ -332,6 +342,7 @@ export default function Home() {
                 </div>
               </div>
               {r.comment && <p style={{fontSize:13,color:'#666',lineHeight:1.5}}>{r.comment}</p>}
+<button onClick={()=>removeFriend(r.user_id)} style={{fontSize:11,color:'#aaa',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',marginTop:4}}>Retirer cet ami</button>
             </div>
           ))}
         </div>
