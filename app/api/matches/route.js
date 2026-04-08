@@ -14,7 +14,7 @@ export async function GET() {
   const allMatches = []
 
   // ==================== FOOTBALL ====================
-  const competitions = ['PL', 'FL1', 'BL1', 'PD', 'SA']
+  const competitions = ['PL', 'FL1', 'BL1', 'PD', 'SA','CL', 'EL', 'ECL']
   for (const comp of competitions) {
     try {
       const res = await fetch(
