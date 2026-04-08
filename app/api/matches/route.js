@@ -107,22 +107,16 @@ export async function GET() {
     }
   } catch (e) {}
 
-  // ==================== TENNIS (ESPN - gratuit, sans clé) ====================
-    // ==================== TENNIS (ATP + WTA via ESPN) ====================
-  
-  // ATP
-    // Diagnostic Tennis
-    // ==================== TENNIS (ATP via ESPN) ====================
+
+      // ==================== TENNIS (ATP via ESPN) ====================
   try {
     const tennisRes = await fetch('https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard')
     const tennisData = await tennisRes.json()
     
     if (tennisData.events && tennisData.events.length > 0) {
       tennisData.events.forEach(event => {
-        // Récupérer le tournoi
         const tournamentName = event.name || event.shortName || 'ATP Tour'
         
-        // Parcourir les groupings (simples, doubles, etc.)
         if (event.groupings && event.groupings.length > 0) {
           event.groupings.forEach(grouping => {
             const competitions = grouping.competitions || []
@@ -130,39 +124,46 @@ export async function GET() {
             competitions.forEach(competition => {
               const competitors = competition.competitors || []
               if (competitors.length >= 2) {
-                // Extraire les noms des joueurs
-                let player1 = 'Joueur 1'
-                let player2 = 'Joueur 2'
-                let score = 'À venir'
+                let player1 = null
+                let player2 = null
                 
-                // Joueur 1 (home)
                 if (competitors[0]?.athlete?.displayName) {
                   player1 = competitors[0].athlete.displayName
                 } else if (competitors[0]?.roster?.shortDisplayName) {
                   player1 = competitors[0].roster.shortDisplayName
-                } else if (competitors[0]?.displayName) {
-                  player1 = competitors[0].displayName
                 }
                 
-                // Joueur 2 (away)
                 if (competitors[1]?.athlete?.displayName) {
                   player2 = competitors[1].athlete.displayName
                 } else if (competitors[1]?.roster?.shortDisplayName) {
                   player2 = competitors[1].roster.shortDisplayName
-                } else if (competitors[1]?.displayName) {
-                  player2 = competitors[1].displayName
                 }
                 
-                // Score
+                if (!player1 || !player2) return
+                if (player1.includes('TBD') || player2.includes('TBD')) return
+                
+                // Score en sets
+                let score = 'À venir'
                 const status = competition.status?.type?.name
-                if (status === 'STATUS_FINAL' || status === 'STATUS_IN_PROGRESS') {
-                  const linescores = competitors.map(c => c.linescores || [])
-                  if (linescores[0]?.length > 0 || linescores[1]?.length > 0) {
-                    const sets1 = linescores[0].map(s => s.value || s).join(' ')
-                    const sets2 = linescores[1].map(s => s.value || s).join(' ')
-                    score = `${sets1} - ${sets2}`
-                  } else if (competitors[0]?.score !== undefined && competitors[1]?.score !== undefined) {
-                    score = `${competitors[0].score} - ${competitors[1].score}`
+                const isFinished = status === 'STATUS_FINAL'
+                const isLive = status === 'STATUS_IN_PROGRESS'
+                
+                if (isFinished || isLive) {
+                  let setsWon1 = 0, setsWon2 = 0
+                  const linescores1 = competitors[0]?.linescores || []
+                  const linescores2 = competitors[1]?.linescores || []
+                  
+                  for (let i = 0; i < Math.max(linescores1.length, linescores2.length); i++) {
+                    const setScore1 = linescores1[i]?.value || linescores1[i]
+                    const setScore2 = linescores2[i]?.value || linescores2[i]
+                    if (setScore1 !== undefined && setScore2 !== undefined) {
+                      if (setScore1 > setScore2) setsWon1++
+                      else if (setScore2 > setScore1) setsWon2++
+                    }
+                  }
+                  
+                  if (setsWon1 > 0 || setsWon2 > 0) {
+                    score = isFinished ? `${setsWon1} - ${setsWon2}` : `${setsWon1} - ${setsWon2} (en cours)`
                   }
                 }
                 
@@ -184,6 +185,7 @@ export async function GET() {
   } catch (e) {
     console.error('Erreur Tennis:', e)
   }
+
 
   allMatches.sort((a, b) => b.date.localeCompare(a.date))
   return Response.json(allMatches)

@@ -1,0 +1,28 @@
+Permettre de rechercher (par date/nom?) un match pour le review
+Notre review va disparaître du profil a un moment?
+
+On veut tous les matchs des 2 jours précédents et 1 jour a l’avance (attention aux horaires avec les USA)
+Integrer une petit ligne pour distinguer les matchs des différents jours
+Les matchs des différents sports sont triés par sport dans l’onglet « tous » de « matchs », mais je préférerais que quand on défile les matchs soient plutôt rangés par chronologie (heure) que par discipline.
+Ajouter heure des matchs??
+Dans l’onglet chat, on pourrait peut être représenter les discussions avec les différents amis comme des cases sur lesquelles on clique pour discuter avec cet ami. On dans la case avant de cliquer dessus on a un aperçu du dernier message avec cet ami, a la maniere d instagram.
+Il y a encore le problème me de quand j envoie un message ça écrit « il y a 2h » alors que je viens de l’envoyer a l’instant
+Ne pas écrire 0-0 pour les matchs de basket pas encore passés mais plutôt mettre la petite bulle « a venir » comme pour le foot.
+Creer une forme d’abonnement où tu peux suivre des équipes/ compétitions et ça t’epingles en haut de la liste de matchs, les matchs pour lesquels t’es abonné a la ligue ou a l équipe..
+Ajouter formule 1
+Afficher « en cours » ou « terminé » selon que c’est en cours en terminé comme on avait écrit « a venir »
+Écrire les dates a la française: JJ/MM/AAAA
+
+
+Ça avance bien, sur la page des matchs il faudrait mettre sa propre note bien en évidence entre les nom du match et le score.Ou alors meme si ça ne change pas d endroit, il faudrait au moins que ce soit un peu plus gros. Il faut aussi préciser aussi devant la moyenne d un match qu il s agit de la moyenne car on se perd un peu là.
+Le message d’erreur quand on se trompe identifiants?mot de passe apparaît une fois qu on a réussi a se connecter (donc trop tard), il faut qu’il apparaisse sur le portail d’authentification.
+Quand un ami partage un match, (si on peut le noter donc pas « a venir ») alors il faut qu on puisse cliquer sur le message du match partagé pour le noter.
+Un autre problème est que si on est sur l appli et quelqu un nous envoie un message il n ‘apparaît pas. Il faut rafraîchir la page internet pour qu il apparaisse. Ce serait bien qu il apparaître instantanément sans avoir a rafraîchir la page internet entière. Pareil pour l’onglet notifs, il serait bien de ne pas avoir à rafraîchir toute la page pour qu elles apparaissent.
+Concernent ces messages dans le chat, comme tu l’as fait pour l’onglet « notifs » j’aimerais un petit rond rouge avec le nombre de nouveau message dans le chat.
+Ensuite je ne sais si c est normal mais comme pour l instant je n ai qu un seul ami, des que je clique sur « partager » en dessous d’un match, ça partage directement a mon unique ami. Mais si j’en ai plusieurs, j ‘aimerais que ça me demande auquel ou auxquels de mes amis je veux partager.
+Et de nouveau il faut faire quelque chose pour les commentaires parce que la on arriver pas tres bien a lire.
+Un autre problème est que sur mon profil je n ‘arrive pas a modifier la note/review que j ai mis a un match en cliquant dessus, il faudrait arranger ça.
+Une autre chose a régler est dans les notifs, quand on signale que quelqu’un un a commenté ta review/note, il faut écrire la note/review de quel match on parle. Par exemple : « @Lowisse a commenté ta note de BARCA-ATHLETICO: « j ai bien aimé comme toi! »
+Autre modification, je veux un drapeau du pays a cote du nom de championnat ou coupe (et drapeau européen pour ldc, Europa League etc)
+
+pour les champiopnnat ecrire le numéro de la journee et pour les competitions ecrire la phase ("demi-finale retour" par exemple)
