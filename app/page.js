@@ -2,7 +2,79 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { getFlag } from './utils/flags'
+
+const Overlay = ({ children, onClose }) => (
+  <div
+    style={{position:'fixed',inset:0,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}
+    onMouseDown={e=>e.target===e.currentTarget&&onClose()}
+  >
+    {children}
+  </div>
+)
+
+const SortBar = ({ value, onChange }) => (
+  <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+    {['recent','ancien','meilleures','mauvaises'].map(s => (
+      <button key={s} onClick={()=>onChange(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:value===s?'#000':'transparent',color:value===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>
+        {s==='recent'?'Récent':s==='ancien'?'Ancien':s==='meilleures'?'Meilleures':'Mauvaises'}
+      </button>
+    ))}
+  </div>
+)
+
+const RatingCard = ({ r, showDelete, onOpenRating, likes, comments, user, friendIds, expandedComments, onToggleLike, onToggleComments, onOpenComment, onReply, onDelete, timeAgo, router }) => {
+  const ratingComments = comments.filter(c => c.rating_id === r.id && !c.parent_id)
+  const getReplies = (commentId) => comments.filter(c => c.parent_id === commentId)
+  const likeCount = likes.filter(l => l.rating_id === r.id).length
+  const liked = likes.some(l => l.rating_id === r.id && l.user_id === user?.id)
+  const expanded = expandedComments[r.id]
+
+  return (
+    <div style={{border:'0.5px solid #ddd',borderRadius:12,padding:'1rem',marginBottom:10,background:'var(--background)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+        <div onClick={()=>router.push(`/profil/${r.profiles?.username}`)} style={{width:32,height:32,borderRadius:'50%',background:'#E6F1FB',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:500,color:'#185FA5',cursor:'pointer',flexShrink:0}}>{r.profiles?.avatar_initials}</div>
+        <div style={{flex:1}}>
+          <div onClick={()=>router.push(`/profil/${r.profiles?.username}`)} style={{fontSize:13,fontWeight:500,cursor:'pointer'}}>@{r.profiles?.username}</div>
+          <div style={{fontSize:11,color:'#aaa'}}>{timeAgo(r.created_at)}</div>
+        </div>
+        <span style={{color:'#EF9F27',fontSize:14}}>{'★'.repeat(r.stars)}{'☆'.repeat(5-r.stars)}</span>
+      </div>
+      <div style={{background:'#f0f0f0',borderRadius:8,padding:'8px 12px',marginBottom:8}}>
+        <div style={{display:'flex',justifyContent:'space-between'}}>
+          <span style={{fontSize:13,fontWeight:500,color:'#222'}}>{r.match_teams}</span>
+          <span style={{fontSize:13,color:'#444'}}>{r.match_score}</span>
+        </div>
+      </div>
+      {r.comment && <p style={{fontSize:13,color:'#333',lineHeight:1.5,marginBottom:8}}>{r.comment}</p>}
+      {expanded && ratingComments.map(c => (
+        <div key={c.id} style={{marginBottom:6,paddingLeft:8,borderLeft:'2px solid #ddd'}}>
+          <span style={{fontSize:12,fontWeight:500,color:'#333'}}>@{c.profiles?.username} </span>
+          <span style={{fontSize:12,color:'#444'}}>{c.content}</span>
+          <div>
+            <button onMouseDown={()=>onReply(r, c)} style={{fontSize:11,color:'#888',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0}}>Répondre</button>
+          </div>
+          {getReplies(c.id).map(reply => (
+            <div key={reply.id} style={{marginTop:4,paddingLeft:8,borderLeft:'2px solid #eee'}}>
+              <span style={{fontSize:12,fontWeight:500,color:'#333'}}>@{reply.profiles?.username} </span>
+              <span style={{fontSize:12,color:'#444'}}>{reply.content}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+      <div style={{display:'flex',alignItems:'center',gap:12,marginTop:8,paddingTop:8,borderTop:'0.5px solid #eee',flexWrap:'wrap'}}>
+        <button onMouseDown={()=>onToggleLike(r)} style={{fontSize:13,background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',color:liked?'#E24B4A':'#bbb',padding:0}}>
+          {liked?'♥':'♡'} {likeCount}
+        </button>
+        <button onMouseDown={()=>onToggleComments(r.id)} style={{fontSize:13,background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',color:expanded?'#333':'#bbb',padding:0}}>
+          💬 {ratingComments.length}
+        </button>
+        <button onMouseDown={()=>onOpenComment(r)} style={{fontSize:12,background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',color:'#bbb',padding:0}}>+ Commenter</button>
+        {showDelete && <button onMouseDown={()=>onDelete(r.id)} style={{fontSize:11,color:'#E24B4A',background:'transparent',border:'0.5px solid #E24B4A',borderRadius:6,padding:'2px 8px',cursor:'pointer',fontFamily:'inherit',marginLeft:'auto'}}>Supprimer</button>}
+        {onOpenRating && <button onMouseDown={onOpenRating} style={{fontSize:11,color:'#555',background:'transparent',border:'0.5px solid #ccc',borderRadius:6,padding:'2px 8px',cursor:'pointer',fontFamily:'inherit',marginLeft:showDelete?4:'auto'}}>Modifier</button>}
+      </div>
+    </div>
+  )
+}
 
 export default function Home() {
   const router = useRouter()
@@ -16,6 +88,7 @@ export default function Home() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [modal, setModal] = useState(null)
+  const [editingRating, setEditingRating] = useState(null)
   const [modalStars, setModalStars] = useState(0)
   const [modalComment, setModalComment] = useState('')
   const [authMode, setAuthMode] = useState('login')
@@ -34,12 +107,12 @@ export default function Home() {
   const [sortProfil, setSortProfil] = useState('recent')
   const [chatFriend, setChatFriend] = useState(null)
   const [chatText, setChatText] = useState('')
+  const [expandedComments, setExpandedComments] = useState({})
   const [now, setNow] = useState(Date.now())
   const [sportFilter, setSportFilter] = useState('Tous')
-  const [authError, setAuthError] = useState('')
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0)
-  const [shareModal, setShareModal] = useState(null)
   const chatBottomRef = useRef(null)
+  const commentInputRef = useRef(null)
+  const chatInputRef = useRef(null)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000)
@@ -55,14 +128,11 @@ export default function Home() {
     fetchMatches()
     fetchAllRatings()
     const channel = supabase.channel('realtime-all')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ratings' }, () => { fetchAllRatings(); fetchFriendFeed() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ratings' }, fetchAllRatings)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, fetchLikes)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, fetchComments)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => { fetchNotifications(); if (tab === 'notifs') markAllRead() })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        fetchMessages()
-        if (tab === 'chat') fetchMessages()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, fetchNotifications)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, fetchMessages)
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [])
@@ -77,58 +147,50 @@ export default function Home() {
     if (chatBottomRef.current) chatBottomRef.current.scrollIntoView({ behavior: 'smooth' })
   }, [messages, chatFriend])
 
+  useEffect(() => {
+    if (commentModal) setTimeout(() => commentInputRef.current?.focus(), 100)
+  }, [commentModal])
+
   async function fetchMatches() {
     const res = await fetch('/api/matches')
     setMatches(await res.json())
   }
-
   async function fetchAllRatings() {
     const { data } = await supabase.from('ratings').select('*, profiles(username, avatar_initials)').order('created_at', { ascending: false })
     setRatings(data || [])
   }
-
   async function fetchLikes() {
     const { data } = await supabase.from('likes').select('*')
     setLikes(data || [])
   }
-
   async function fetchComments() {
     const { data } = await supabase.from('comments').select('*, profiles(username, avatar_initials)').order('created_at', { ascending: true })
     setComments(data || [])
   }
-
   async function fetchNotifications() {
     if (!user) return
-    const { data } = await supabase.from('notifications').select('*, profiles!notifications_from_user_id_fkey(username), comments(content)').eq('user_id', user.id).order('created_at', { ascending: false })
+    const { data } = await supabase.from('notifications').select('*, profiles!notifications_from_user_id_fkey(username)').eq('user_id', user.id).order('created_at', { ascending: false })
     setNotifications(data || [])
   }
-
   async function fetchMessages() {
     if (!user) return
     const { data } = await supabase.from('messages').select('*, profiles!messages_from_user_id_fkey(username, avatar_initials)').or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`).order('created_at', { ascending: true })
     setMessages(data || [])
-    const unread = (data || []).filter(m => m.to_user_id === user.id && !m.read).length
-    setUnreadMessagesCount(unread)
   }
-
   async function fetchProfile() {
-    if (!user) return
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(data)
   }
-
   async function fetchFriends() {
     const { data } = await supabase.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(id, username, avatar_initials)').eq('user_id', user.id).eq('status', 'accepted')
     setFriends(data || [])
     setFriendIds((data || []).map(f => f.friend_id))
   }
-
   async function fetchFriendFeed() {
     if (!friendIds.length) { setFriendFeed([]); return }
     const { data } = await supabase.from('ratings').select('*, profiles(username, avatar_initials)').in('user_id', friendIds).order('created_at', { ascending: false })
     setFriendFeed(data || [])
   }
-
   async function fetchPendingRequests() {
     const { data } = await supabase.from('friendships').select('*, profiles!friendships_user_id_fkey(username, avatar_initials)').eq('friend_id', user.id).eq('status', 'pending')
     setPendingRequests(data || [])
@@ -136,28 +198,37 @@ export default function Home() {
 
   async function handleAuth() {
     setLoading(true)
-    setAuthError('')
     if (authMode === 'signup') {
       const { data: existing } = await supabase.from('profiles').select('id').eq('username', username).single()
-      if (existing) { setAuthError('Ce nom est déjà utilisé.'); setLoading(false); return }
+      if (existing) { showConfirm({ title: 'Nom déjà pris', message: 'Ce nom est déjà utilisé.', single: true }); setLoading(false); return }
       const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) { setAuthError(error.message); setLoading(false); return }
-      if (data.user) await supabase.from('profiles').insert({ id: data.user.id, username, avatar_initials: username.slice(0,2).toUpperCase() })
-      setAuthError('✅ Compte créé ! Vérifie tes emails.')
+      if (!error && data.user) await supabase.from('profiles').insert({ id: data.user.id, username, avatar_initials: username.slice(0,2).toUpperCase() })
+      showConfirm({ title: error ? 'Erreur' : 'Compte créé !', message: error ? error.message : 'Vérifie tes emails.', single: true })
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setAuthError('❌ Email ou mot de passe incorrect'); setLoading(false); return }
+      if (error) showConfirm({ title: 'Erreur', message: error.message, single: true })
     }
     setLoading(false)
   }
 
   async function handleLogout() { await supabase.auth.signOut(); setUser(null); setProfile(null) }
 
+  function openRatingModal(match) {
+    const existing = ratings.find(r => r.match_id === match.id && r.user_id === user?.id)
+    if (existing) { setEditingRating(existing); setModalStars(existing.stars); setModalComment(existing.comment || '') }
+    else { setEditingRating(null); setModalStars(0); setModalComment('') }
+    setModal(match)
+  }
+
   async function submitRating() {
     if (modalStars === 0) { showConfirm({ title: 'Note manquante', message: 'Choisis une note.', single: true }); return }
-    await supabase.from('ratings').insert({ user_id: user.id, match_id: modal.id, match_teams: modal.teams, match_score: modal.score, match_league: modal.league, match_date: modal.date, stars: modalStars, comment: modalComment })
-    setModal(null); setModalStars(0); setModalComment('')
-    fetchAllRatings(); fetchMatches()
+    if (editingRating) {
+      await supabase.from('ratings').update({ stars: modalStars, comment: modalComment }).eq('id', editingRating.id)
+    } else {
+      await supabase.from('ratings').insert({ user_id: user.id, match_id: modal.id, match_teams: modal.teams, match_score: modal.score, match_league: modal.league, match_date: modal.date, stars: modalStars, comment: modalComment })
+    }
+    setModal(null); setModalStars(0); setModalComment(''); setEditingRating(null)
+    fetchAllRatings()
   }
 
   async function deleteRating(ratingId) {
@@ -184,6 +255,7 @@ export default function Home() {
     }
     setCommentText(''); setReplyTo(null)
     fetchComments()
+    setTimeout(() => commentInputRef.current?.focus(), 50)
   }
 
   async function sendMessage() {
@@ -191,38 +263,20 @@ export default function Home() {
     await supabase.from('messages').insert({ from_user_id: user.id, to_user_id: chatFriend.friend_id, content: chatText.trim() })
     setChatText('')
     fetchMessages()
+    setTimeout(() => chatInputRef.current?.focus(), 50)
   }
 
-  async function sendMatchInChat(match) {
-    if (!chatFriend) return
-    await supabase.from('messages').insert({ from_user_id: user.id, to_user_id: chatFriend.friend_id, match_id: match.id, match_teams: match.teams, match_score: match.score })
-    fetchMessages()
-  }
-
-  async function sendMatchToMultipleFriends(match, selectedFriendIds) {
-    for (const friendId of selectedFriendIds) {
-      await supabase.from('messages').insert({ 
-        from_user_id: user.id, 
-        to_user_id: friendId, 
-        match_id: match.id, 
-        match_teams: match.teams, 
-        match_score: match.score 
-      })
-    }
-    setShareModal(null)
+  async function sendMatchInChat(match, friendOverride) {
+    const target = friendOverride || chatFriend
+    if (!target) return
+    await supabase.from('messages').insert({ from_user_id: user.id, to_user_id: target.friend_id, match_id: match.id, match_teams: match.teams, match_score: match.score })
     fetchMessages()
   }
 
   async function markAllRead() {
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id)
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     fetchNotifications()
   }
-
-  async function setMessagesRead() {
-  if (!user) return
-  await supabase.from('messages').update({ read: true }).eq('to_user_id', user.id).eq('read', false)
-  await fetchMessages()
-}
 
   async function sendFriendRequest(friendUsername) {
     if (!friendUsername) return
@@ -251,12 +305,12 @@ export default function Home() {
   }
 
   function showConfirm({ title, message, onConfirm, single }) { setConfirmModal({ title, message, onConfirm, single }) }
-  function getMatchRatings(matchId) { return ratings.filter(r => r.match_id === matchId && (r.user_id === user?.id || friendIds.includes(r.user_id))) }
+
   function getMyRating(matchId) { return ratings.find(r => r.match_id === matchId && r.user_id === user?.id) }
-  function getLikeCount(ratingId) { return likes.filter(l => l.rating_id === ratingId).length }
-  function isLiked(ratingId) { return likes.some(l => l.rating_id === ratingId && l.user_id === user?.id) }
-  function getRatingComments(ratingId) { return comments.filter(c => c.rating_id === ratingId && !c.parent_id) }
-  function getReplies(commentId) { return comments.filter(c => c.parent_id === commentId) }
+  function getFriendRatings(matchId) { return ratings.filter(r => r.match_id === matchId && friendIds.includes(r.user_id)) }
+  function getMatchRatings(matchId) { return ratings.filter(r => r.match_id === matchId && (r.user_id === user?.id || friendIds.includes(r.user_id))) }
+  function toggleComments(ratingId) { setExpandedComments(prev => ({ ...prev, [ratingId]: !prev[ratingId] })) }
+  function isUpcoming(match) { return match.score === 'À venir' }
   function getChatMessages() {
     if (!chatFriend) return []
     return messages.filter(m => (m.from_user_id === user.id && m.to_user_id === chatFriend.friend_id) || (m.from_user_id === chatFriend.friend_id && m.to_user_id === user.id))
@@ -280,68 +334,9 @@ export default function Home() {
   }
 
   const filteredMatches = sportFilter === 'Tous' ? matches : matches.filter(m => m.sport === sportFilter)
-
-  const SortBar = ({ value, onChange }) => (
-    <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-      {['recent','ancien','meilleures','mauvaises'].map(s => (
-        <button key={s} onClick={()=>onChange(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:value===s?'#000':'transparent',color:value===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>
-          {s==='recent'?'Récent':s==='ancien'?'Ancien':s==='meilleures'?'Meilleures':'Mauvaises'}
-        </button>
-      ))}
-    </div>
-  )
-
-  const RatingCard = ({ r, showDelete }) => (
-    <div style={{border:'0.5px solid #ddd',borderRadius:12,padding:'1rem',marginBottom:10,background:'var(--background)'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-        <div onClick={()=>router.push(`/profil/${r.profiles?.username}`)} style={{width:32,height:32,borderRadius:'50%',background:'#E6F1FB',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:500,color:'#185FA5',cursor:'pointer',flexShrink:0}}>{r.profiles?.avatar_initials}</div>
-        <div style={{flex:1}}>
-          <div onClick={()=>router.push(`/profil/${r.profiles?.username}`)} style={{fontSize:13,fontWeight:500,cursor:'pointer'}}>@{r.profiles?.username}</div>
-          <div style={{fontSize:11,color:'#aaa'}}>{timeAgo(r.created_at)}</div>
-        </div>
-        <span style={{color:'#EF9F27',fontSize:14}}>{'★'.repeat(r.stars)}{'☆'.repeat(5-r.stars)}</span>
-      </div>
-      <div style={{background:'#f5f5f5',borderRadius:8,padding:'8px 12px',marginBottom:8}}>
-        <div style={{display:'flex',justifyContent:'space-between'}}>
-          <span style={{fontSize:13,fontWeight:500}}>{r.match_teams}</span>
-          <span style={{fontSize:13,color:'#555'}}>{r.match_score}</span>
-        </div>
-      </div>
-      {r.comment && <p style={{fontSize:13,color:'#444',lineHeight:1.5,marginBottom:8}}>{r.comment}</p>}
-      {getRatingComments(r.id).map(c => (
-        <div key={c.id} style={{marginBottom:6,paddingLeft:8,borderLeft:'2px solid #eee'}}>
-          <span style={{fontSize:12,fontWeight:500,color:'#444'}}>@{c.profiles?.username} </span>
-          <span style={{fontSize:12,color:'#555'}}>{c.content}</span>
-          <div style={{display:'flex',gap:8,marginTop:2}}>
-            <button onClick={()=>setReplyTo(c)} style={{fontSize:11,color:'#aaa',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0}}>Répondre</button>
-          </div>
-          {getReplies(c.id).map(reply => (
-            <div key={reply.id} style={{marginTop:4,paddingLeft:8,borderLeft:'2px solid #f5f5f5'}}>
-              <span style={{fontSize:12,fontWeight:500,color:'#444'}}>@{reply.profiles?.username} </span>
-              <span style={{fontSize:12,color:'#555'}}>{reply.content}</span>
-            </div>
-          ))}
-        </div>
-      ))}
-      <div style={{display:'flex',alignItems:'center',gap:12,marginTop:8,paddingTop:8,borderTop:'0.5px solid #eee'}}>
-        <button onClick={()=>toggleLike(r)} style={{fontSize:13,background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',color:isLiked(r.id)?'#E24B4A':'#bbb',padding:0}}>
-          {isLiked(r.id)?'♥':'♡'} {getLikeCount(r.id)}
-        </button>
-        <button onClick={()=>{setCommentModal(r);setCommentText('');setReplyTo(null)}} style={{fontSize:13,background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',color:'#bbb',padding:0}}>
-          💬 {getRatingComments(r.id).length}
-        </button>
-        {showDelete && <button onClick={()=>deleteRating(r.id)} style={{fontSize:11,color:'#E24B4A',background:'transparent',border:'0.5px solid #E24B4A',borderRadius:6,padding:'2px 8px',cursor:'pointer',fontFamily:'inherit',marginLeft:'auto'}}>Supprimer</button>}
-      </div>
-    </div>
-  )
-
   const unreadCount = notifications.filter(n => !n.read).length
 
-  const Overlay = ({ children, onClose }) => (
-    <div style={{position:'fixed',inset:0,backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      {children}
-    </div>
-  )
+  const ratingCardProps = { likes, comments, user, friendIds, expandedComments, onToggleLike: toggleLike, onToggleComments: toggleComments, onOpenComment: (r) => { setCommentModal(r); setCommentText(''); setReplyTo(null) }, onReply: (r, c) => { setCommentModal(r); setReplyTo(c) }, onDelete: deleteRating, timeAgo, router }
 
   if (!user) return (
     <div style={{maxWidth:380,margin:'60px auto',padding:'0 1rem'}}>
@@ -357,7 +352,6 @@ export default function Home() {
       <button onClick={handleAuth} disabled={loading} style={{width:'100%',padding:'10px',background:'#000',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Chargement...':authMode==='login'?'Se connecter':'Créer le compte'}
       </button>
-      {authError && <p style={{color:authError.includes('✅')?'green':'#E24B4A',fontSize:12,marginTop:8,textAlign:'center'}}>{authError}</p>}
     </div>
   )
 
@@ -367,81 +361,73 @@ export default function Home() {
         <span style={{fontSize:20,fontWeight:500}}>Kickrate</span>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:13,color:'#888'}}>@{profile?.username}</span>
-          <button onClick={handleLogout} style={{fontSize:12,color:'#888',background:'transparent',border:'0.5px solid #ccc',borderRadius:6,padding:'4px 8px',cursor:'pointer',fontFamily:'inherit'}}>Déconnexion</button>
+          <button onClick={handleLogout} style={{fontSize:12,color:'#888',background:'transparent',border:'0.5px solid #ccc',borderRadius:6,padding:'4px 8px',cursor:'pointer',fontFamily:'inherit'}}>Déco</button>
         </div>
       </div>
 
       <div style={{display:'flex',border:'0.5px solid #ddd',borderRadius:10,overflow:'hidden',marginBottom:20}}>
         {['matches','feed','chat','notifs','profil'].map(t=>(
-          <button key={t} onClick={()=>{setTab(t);if(t==='notifs')markAllRead();if(t==='chat')setMessagesRead()}} style={{flex:1,padding:'8px 0',fontSize:11,background:tab===t?'#f5f5f5':'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:tab===t?500:400,position:'relative'}}>
+          <button key={t} onClick={()=>{ setTab(t); if(t==='notifs') markAllRead() }} style={{flex:1,padding:'8px 0',fontSize:11,background:tab===t?'#f5f5f5':'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:tab===t?500:400,position:'relative'}}>
             {t==='matches'?'Matchs':t==='feed'?'Amis':t==='chat'?'Chat':t==='notifs'?'Notifs':'Profil'}
             {t==='feed'&&pendingRequests.length>0&&<span style={{position:'absolute',top:4,right:4,background:'#E24B4A',color:'#fff',borderRadius:'50%',width:14,height:14,fontSize:9,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingRequests.length}</span>}
             {t==='notifs'&&unreadCount>0&&<span style={{position:'absolute',top:4,right:4,background:'#E24B4A',color:'#fff',borderRadius:'50%',width:14,height:14,fontSize:9,display:'flex',alignItems:'center',justifyContent:'center'}}>{unreadCount}</span>}
-            {t==='chat'&&unreadMessagesCount>0&&<span style={{position:'absolute',top:4,right:4,background:'#E24B4A',color:'#fff',borderRadius:'50%',width:14,height:14,fontSize:9,display:'flex',alignItems:'center',justifyContent:'center'}}>{unreadMessagesCount}</span>}
           </button>
         ))}
       </div>
 
       {tab==='matches' && (
         <div>
-          <div style={{display:'flex',gap:6,marginBottom:12}}>
-            {['Tous','Football','Basket','F1','Tennis'].map(s=>(
-              <button key={s} onClick={()=>setSportFilter(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:sportFilter===s?'#000':'transparent',color:sportFilter===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>
-                {s}
-              </button>
+          <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+            {['Tous','Football','Basket','Tennis','F1'].map(s=>(
+              <button key={s} onClick={()=>setSportFilter(s)} style={{padding:'4px 12px',fontSize:12,border:'0.5px solid #ddd',borderRadius:20,background:sportFilter===s?'#000':'transparent',color:sportFilter===s?'#fff':'#666',cursor:'pointer',fontFamily:'inherit'}}>{s}</button>
             ))}
           </div>
-          <p style={{fontSize:12,color:'#aaa',marginBottom:12}}>Clique sur un match pour le noter</p>
           {filteredMatches.length===0&&<p style={{color:'#aaa',fontSize:14}}>Aucun match.</p>}
           {filteredMatches.map(m=>{
-            const mRatings=getMatchRatings(m.id)
-            const myRating=getMyRating(m.id)
-            const avg=mRatings.length?(mRatings.reduce((a,r)=>a+r.stars,0)/mRatings.length).toFixed(1):null
+            const myRating = getMyRating(m.id)
+            const friendRatings = getFriendRatings(m.id)
+            const allRatings = getMatchRatings(m.id)
+            const avg = allRatings.length?(allRatings.reduce((a,r)=>a+r.stars,0)/allRatings.length).toFixed(1):null
+            const upcoming = isUpcoming(m)
             return (
-              <div key={m.id} onClick={()=>!myRating&&setModal(m)} style={{background:'var(--background)',border:'0.5px solid #ddd',borderRadius:12,padding:'1rem',marginBottom:10,cursor:myRating?'default':'pointer'}}>
-  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-    <span style={{fontSize:11,background:'#f5f5f5',padding:'2px 8px',borderRadius:20,color:'#666'}}>
-      {getFlag(m.league)} {m.league}
-    </span>
-    <span style={{fontSize:11,color:'#aaa'}}>{m.date}</span>
-  </div>
-  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-    {m.sport === 'Tennis' && (m.teams.includes('&') || m.teams.includes('/')) ? (
-  <div style={{fontSize:13,fontWeight:500,lineHeight:1.4}}>
-    {m.teams.split('—').map((part, i) => (
-      <div key={i}>
-        {i === 0 ? `${part.trim()} —` : part.trim()}
-      </div>
-    ))}
-  </div>
-) : (
-  <span style={{fontSize:15,fontWeight:500}}>{m.teams}</span>
-)}
-    {m.score === 'À venir' ? (
-      <span style={{fontSize:11,background:'#f5f0d0',padding:'2px 8px',borderRadius:20,color:'#b8860b'}}>À venir</span>
-    ) : (
-      <span style={{fontSize:18,fontWeight:500}}>{m.score}</span>
-    )}
-  </div>
-  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:'0.5px solid #eee',paddingTop:8}}>
-    <div>
-      {myRating ? (
-        <span style={{color:'#EF9F27',fontSize:18,fontWeight:600}}>{'★'.repeat(myRating.stars)}{'☆'.repeat(5-myRating.stars)}</span>
-      ) : (
-        <span style={{fontSize:12,color:'#aaa'}}>Clique pour noter</span>
-      )}
-    </div>
-    <div style={{fontSize:12,color:'#aaa'}}>
-      {avg ? <span>⭐ Moyenne: {avg} · {mRatings.length} note{mRatings.length>1?'s':''}</span> : ''}
-    </div>
-  </div>
-  {mRatings.filter(r=>r.comment).slice(0,1).map(r=>(
-    <div key={r.id} style={{marginTop:8,paddingTop:8,borderTop:'0.5px solid #eee'}}>
-      <span style={{fontSize:12,fontWeight:500,color:'#444'}}>@{r.profiles?.username} </span>
-      <span style={{fontSize:12,color:'#555'}}>{r.comment}</span>
-    </div>
-  ))}
-</div>
+              <div key={m.id} style={{background:'var(--background)',border:'0.5px solid #ddd',borderRadius:12,padding:'1rem',marginBottom:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:11,background:'#f5f5f5',padding:'2px 8px',borderRadius:20,color:'#666'}}>{m.league}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    {upcoming&&<span style={{fontSize:11,background:'#FFF3CD',color:'#856404',padding:'2px 8px',borderRadius:20}}>À venir</span>}
+                    <span style={{fontSize:11,color:'#aaa'}}>{m.date}</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                  <span style={{fontSize:15,fontWeight:500}}>{m.teams}</span>
+                  {!upcoming&&<span style={{fontSize:18,fontWeight:500}}>{m.score}</span>}
+                </div>
+                <div style={{borderTop:'0.5px solid #eee',paddingTop:8}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:friendRatings.length>0?8:0}}>
+                    <div>
+                      {myRating
+                        ? <span onClick={()=>!upcoming&&openRatingModal(m)} style={{color:'#EF9F27',fontSize:13,cursor:'pointer'}}>{'★'.repeat(myRating.stars)}{'☆'.repeat(5-myRating.stars)} <span style={{fontSize:11,color:'#aaa'}}>Ma note</span></span>
+                        : <button onClick={()=>!upcoming&&openRatingModal(m)} disabled={upcoming} style={{fontSize:12,color:upcoming?'#ccc':'#333',background:'transparent',border:`0.5px solid ${upcoming?'#eee':'#ccc'}`,borderRadius:6,padding:'3px 8px',cursor:upcoming?'default':'pointer',fontFamily:'inherit'}}>{upcoming?'Match à venir':'Noter'}</button>
+                      }
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      {avg&&<span style={{fontSize:11,color:'#aaa'}}>⭐ {avg} ({allRatings.length})</span>}
+                      <button onClick={()=>{ if(friends.length===0){showConfirm({title:'Aucun ami',message:'Ajoute des amis pour partager.',single:true});return} if(friends.length===1){sendMatchInChat(m,friends[0]);showConfirm({title:'Partagé !',message:`Envoyé à @${friends[0].profiles?.username}`,single:true});return} showConfirm({title:'Partager',message:'Va dans le Chat pour partager ce match avec un ami spécifique.',single:true}) }} style={{fontSize:11,color:'#185FA5',background:'transparent',border:'0.5px solid #185FA5',borderRadius:6,padding:'2px 8px',cursor:'pointer',fontFamily:'inherit'}}>Partager</button>
+                    </div>
+                  </div>
+                  {friendRatings.length>0&&(
+                    <div style={{marginTop:6,padding:'8px',background:'#f9f9f9',borderRadius:8}}>
+                      {friendRatings.map(fr=>(
+                        <div key={fr.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                          <span style={{fontSize:12,fontWeight:500,color:'#444'}}>@{fr.profiles?.username}</span>
+                          <span style={{color:'#EF9F27',fontSize:12}}>{'★'.repeat(fr.stars)}{'☆'.repeat(5-fr.stars)}</span>
+                          {fr.comment&&<span style={{fontSize:11,color:'#555',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{fr.comment}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             )
           })}
         </div>
@@ -466,7 +452,7 @@ export default function Home() {
             <input id="friend-input" placeholder="Nom d'utilisateur" style={{flex:1,padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',color:'inherit',fontFamily:'inherit',fontSize:13}} />
             <button onClick={()=>sendFriendRequest(document.getElementById('friend-input').value)} style={{padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer',fontFamily:'inherit',fontSize:13}}>Ajouter</button>
           </div>
-                    {friends.length>0&&(
+          {friends.length>0&&(
             <div style={{marginBottom:16}}>
               <p style={{fontSize:13,fontWeight:500,marginBottom:8}}>Mes amis</p>
               <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
@@ -477,11 +463,7 @@ export default function Home() {
                       <span style={{fontSize:13,fontWeight:500}}>@{f.profiles?.username}</span>
                     </div>
                     <div style={{display:'flex',gap:6}}>
-                      <button onClick={() => {
-                        setChatFriend(f);
-                        setTab('chat');
-                        supabase.from('messages').update({ read: true }).eq('to_user_id', user.id).eq('from_user_id', f.friend_id).eq('read', false).then(() => fetchMessages());
-                      }} style={{flex:1,fontSize:11,color:'#185FA5',background:'transparent',border:'0.5px solid #185FA5',borderRadius:6,padding:'3px 6px',cursor:'pointer',fontFamily:'inherit'}}>Chat</button>
+                      <button onClick={()=>{setChatFriend(f);setTab('chat')}} style={{flex:1,fontSize:11,color:'#185FA5',background:'transparent',border:'0.5px solid #185FA5',borderRadius:6,padding:'3px 6px',cursor:'pointer',fontFamily:'inherit'}}>Chat</button>
                       <button onClick={()=>removeFriend(f.friend_id,f.profiles?.username)} style={{flex:1,fontSize:11,color:'#E24B4A',background:'transparent',border:'0.5px solid #E24B4A',borderRadius:6,padding:'3px 6px',cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
                     </div>
                   </div>
@@ -491,51 +473,32 @@ export default function Home() {
           )}
           <p style={{fontSize:13,fontWeight:500,marginBottom:8}}>Fil d'actualité</p>
           {friendFeed.length===0&&<p style={{color:'#aaa',fontSize:14}}>Aucune note de tes amis pour l'instant.</p>}
-          {friendFeed.map(r=><RatingCard key={r.id} r={r} showDelete={false} />)}
+          {friendFeed.map(r=><RatingCard key={r.id} r={r} showDelete={false} {...ratingCardProps} />)}
         </div>
       )}
 
-            {tab==='chat' && (
+      {tab==='chat' && (
         <div>
           <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-            {friends.map(f => (
-              <button 
-                key={f.friend_id} 
-                onClick={async () => {
-                  setChatFriend(f)
-                  await supabase.from('messages').update({ read: true }).eq('to_user_id', user.id).eq('from_user_id', f.friend_id).eq('read', false)
-                  fetchMessages()
-                }} 
-                style={{padding:'6px 12px',fontSize:13,border:'0.5px solid #ddd',borderRadius:20,background:chatFriend?.friend_id === f.friend_id ? '#000' : 'transparent',color:chatFriend?.friend_id === f.friend_id ? '#fff' : 'inherit',cursor:'pointer',fontFamily:'inherit'}}
-              >
+            {friends.map(f=>(
+              <button key={f.friend_id} onClick={()=>setChatFriend(f)} style={{padding:'6px 12px',fontSize:13,border:'0.5px solid #ddd',borderRadius:20,background:chatFriend?.friend_id===f.friend_id?'#000':'transparent',color:chatFriend?.friend_id===f.friend_id?'#fff':'inherit',cursor:'pointer',fontFamily:'inherit'}}>
                 @{f.profiles?.username}
               </button>
             ))}
           </div>
-          {!chatFriend && <p style={{color:'#aaa',fontSize:14}}>Sélectionne un ami pour chatter.</p>}
-          {chatFriend && (
+          {!chatFriend&&<p style={{color:'#aaa',fontSize:14}}>Sélectionne un ami pour chatter.</p>}
+          {chatFriend&&(
             <div>
-              <p style={{fontSize:13,fontWeight:500,marginBottom:12}}>Chat avec @{chatFriend.profiles?.username}</p>
               <div style={{border:'0.5px solid #ddd',borderRadius:12,padding:'1rem',marginBottom:12,minHeight:300,maxHeight:400,overflowY:'auto',display:'flex',flexDirection:'column',gap:8}}>
-                {getChatMessages().length === 0 && <p style={{color:'#aaa',fontSize:13,textAlign:'center',marginTop:'auto'}}>Commencez à chatter !</p>}
-                {getChatMessages().map(m => (
-                  <div key={m.id} style={{display:'flex',flexDirection:'column',alignItems:m.from_user_id === user.id ? 'flex-end' : 'flex-start'}}>
-                    {m.content && (
-                      <div style={{background:m.from_user_id === user.id ? '#000' : '#f5f5f5',color:m.from_user_id === user.id ? '#fff' : '#333',padding:'8px 12px',borderRadius:12,maxWidth:'80%',fontSize:13}}>
-                        {m.content}
-                      </div>
-                    )}
-                    {m.match_teams && (
-                      <div 
-                        style={{background:m.from_user_id === user.id ? '#333' : '#f5f5f5',borderRadius:10,padding:'8px 12px',maxWidth:'80%',cursor:'pointer'}} 
-                        onClick={() => {
-                          const match = matches.find(mt => mt.id === m.match_id)
-                          if (match && match.score !== 'À venir') setModal(match)
-                        }}
-                      >
-                        <div style={{fontSize:12,color:m.from_user_id === user.id ? '#aaa' : '#888',marginBottom:2}}>Match partagé</div>
-                        <div style={{fontSize:13,fontWeight:500,color:m.from_user_id === user.id ? '#fff' : '#333'}}>{m.match_teams}</div>
-                        <div style={{fontSize:12,color:m.from_user_id === user.id ? '#ccc' : '#666'}}>{m.match_score}</div>
+                {getChatMessages().length===0&&<p style={{color:'#aaa',fontSize:13,textAlign:'center',margin:'auto'}}>Commencez à chatter !</p>}
+                {getChatMessages().map(m=>(
+                  <div key={m.id} style={{display:'flex',flexDirection:'column',alignItems:m.from_user_id===user.id?'flex-end':'flex-start'}}>
+                    {m.content&&<div style={{background:m.from_user_id===user.id?'#000':'#f0f0f0',color:m.from_user_id===user.id?'#fff':'#222',padding:'8px 12px',borderRadius:12,maxWidth:'80%',fontSize:13}}>{m.content}</div>}
+                    {m.match_teams&&(
+                      <div style={{background:m.from_user_id===user.id?'#222':'#f0f0f0',borderRadius:10,padding:'8px 12px',maxWidth:'80%'}}>
+                        <div style={{fontSize:11,color:m.from_user_id===user.id?'#aaa':'#888',marginBottom:2}}>Match partagé</div>
+                        <div style={{fontSize:13,fontWeight:500,color:m.from_user_id===user.id?'#fff':'#222'}}>{m.match_teams}</div>
+                        <div style={{fontSize:12,color:m.from_user_id===user.id?'#ccc':'#555'}}>{m.match_score}</div>
                       </div>
                     )}
                     <div style={{fontSize:10,color:'#aaa',marginTop:2}}>{timeAgo(m.created_at)}</div>
@@ -546,30 +509,19 @@ export default function Home() {
               <div style={{marginBottom:12}}>
                 <p style={{fontSize:12,color:'#aaa',marginBottom:6}}>Partager un match :</p>
                 <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
-                  {matches.slice(0,5).map(m => (
-                    <button 
-                      key={m.id} 
-                      onClick={() => {
-                        if (friends.length === 1) {
-                          sendMatchInChat(m)
-                        } else {
-                          setShareModal(m)
-                        }
-                      }} 
-                      style={{flexShrink:0,padding:'4px 10px',fontSize:11,border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}
-                    >
-                      {m.teams}
-                    </button>
+                  {matches.slice(0,5).map(m=>(
+                    <button key={m.id} onClick={()=>sendMatchInChat(m)} style={{flexShrink:0,padding:'4px 10px',fontSize:11,border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{m.teams}</button>
                   ))}
                 </div>
               </div>
               <div style={{display:'flex',gap:8}}>
-                <input 
-                  value={chatText} 
-                  onChange={e => setChatText(e.target.value)} 
-                  onKeyDown={e => e.key === 'Enter' && sendMessage()} 
-                  placeholder="Message..." 
-                  style={{flex:1,padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',color:'inherit',fontFamily:'inherit',fontSize:13}} 
+                <input
+                  ref={chatInputRef}
+                  value={chatText}
+                  onChange={e=>setChatText(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&sendMessage()}
+                  placeholder="Message..."
+                  style={{flex:1,padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',color:'inherit',fontFamily:'inherit',fontSize:13}}
                 />
                 <button onClick={sendMessage} style={{padding:'8px 14px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>↑</button>
               </div>
@@ -582,20 +534,16 @@ export default function Home() {
         <div>
           <p style={{fontSize:13,fontWeight:500,marginBottom:12}}>Notifications</p>
           {notifications.length===0&&<p style={{color:'#aaa',fontSize:14}}>Aucune notification.</p>}
-          {notifications.map(n=>{
-            const relatedRating = ratings.find(r => r.id === n.rating_id)
-            return (
-              <div key={n.id} style={{border:'0.5px solid #ddd',borderRadius:10,padding:'10px 14px',marginBottom:8,background:n.read?'var(--background)':'#f9f9f9'}}>
-                <div style={{fontSize:13,color:'#333'}}>
-                  <span style={{fontWeight:500}}>@{n.profiles?.username}</span>
-                  {n.type==='like'?' a aimé ta note':` a commenté ta note`}
-                  {relatedRating && <span style={{color:'#666'}}> de {relatedRating.match_teams}</span>}
-                  {n.type==='comment'&&n.comment_content&&<span style={{color:'#555',fontStyle:'italic'}}> : "{n.comment_content}"</span>}
-                </div>
-                <div style={{fontSize:11,color:'#aaa',marginTop:2}}>{timeAgo(n.created_at)}</div>
+          {notifications.map(n=>(
+            <div key={n.id} style={{border:'0.5px solid #ddd',borderRadius:10,padding:'10px 14px',marginBottom:8,background:n.read?'var(--background)':'#f9f9f9'}}>
+              <div style={{fontSize:13,color:'#333'}}>
+                <span style={{fontWeight:500}}>@{n.profiles?.username}</span>
+                {n.type==='like'?' a aimé ta note.':' a commenté ta note :'}
+                {n.type==='comment'&&n.comment_content&&<span style={{color:'#444',fontStyle:'italic'}}> « {n.comment_content} »</span>}
               </div>
-            )
-          })}
+              <div style={{fontSize:11,color:'#aaa',marginTop:2}}>{timeAgo(n.created_at)}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -609,35 +557,38 @@ export default function Home() {
             </div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:16}}>
-            <div style={{background:'#f9f9f9',borderRadius:8,padding:'10px',textAlign:'center'}}>
+            <div style={{background:'#f5f5f5',borderRadius:8,padding:'10px',textAlign:'center'}}>
               <div style={{fontSize:22,fontWeight:500}}>{ratings.filter(r=>r.user_id===user.id).length}</div>
-              <div style={{fontSize:11,color:'#aaa'}}>Matchs notés</div>
+              <div style={{fontSize:11,color:'#666'}}>Matchs notés</div>
             </div>
-            <div style={{background:'#f9f9f9',borderRadius:8,padding:'10px',textAlign:'center'}}>
+            <div style={{background:'#f5f5f5',borderRadius:8,padding:'10px',textAlign:'center'}}>
               <div style={{fontSize:22,fontWeight:500}}>{ratings.filter(r=>r.user_id===user.id).length?(ratings.filter(r=>r.user_id===user.id).reduce((a,r)=>a+r.stars,0)/ratings.filter(r=>r.user_id===user.id).length).toFixed(1):'-'}</div>
-              <div style={{fontSize:11,color:'#aaa'}}>Note moyenne</div>
+              <div style={{fontSize:11,color:'#666'}}>Note moyenne</div>
             </div>
           </div>
           <SortBar value={sortProfil} onChange={setSortProfil} />
-          {getSortedMyRatings().map(r=><RatingCard key={r.id} r={r} showDelete={true} />)}
+          {getSortedMyRatings().map(r=>{
+            const match = matches.find(m=>m.id===r.match_id)
+            return <RatingCard key={r.id} r={r} showDelete={true} onOpenRating={match?()=>openRatingModal(match):null} {...ratingCardProps} />
+          })}
         </div>
       )}
 
       {modal&&(
-        <Overlay onClose={()=>setModal(null)}>
+        <Overlay onClose={()=>{setModal(null);setEditingRating(null)}}>
           <div style={{background:'var(--background)',borderRadius:16,padding:'1.5rem',width:340,maxWidth:'90vw',border:'0.5px solid #ddd'}}>
-            <div style={{fontSize:16,fontWeight:500,marginBottom:12}}>Noter ce match</div>
-            <div style={{background:'#f5f5f5',borderRadius:10,padding:'12px',marginBottom:16,textAlign:'center'}}>
-              <div style={{fontSize:17,fontWeight:500}}>{modal.teams}</div>
-              <div style={{fontSize:13,color:'#666'}}>{modal.score} · {modal.league}</div>
+            <div style={{fontSize:16,fontWeight:500,marginBottom:12}}>{editingRating?'Modifier ta note':'Noter ce match'}</div>
+            <div style={{background:'#f0f0f0',borderRadius:10,padding:'12px',marginBottom:16,textAlign:'center'}}>
+              <div style={{fontSize:17,fontWeight:500,color:'#222'}}>{modal.teams}</div>
+              <div style={{fontSize:13,color:'#555'}}>{modal.score} · {modal.league}</div>
             </div>
             <div style={{display:'flex',justifyContent:'center',gap:10,marginBottom:16}}>
               {[1,2,3,4,5].map(s=><span key={s} onClick={()=>setModalStars(s)} style={{fontSize:32,cursor:'pointer',color:s<=modalStars?'#EF9F27':'#ddd'}}>★</span>)}
             </div>
             <textarea value={modalComment} onChange={e=>setModalComment(e.target.value)} placeholder="Ton avis... (optionnel)" style={{width:'100%',padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,resize:'none',height:70,background:'transparent',color:'inherit',fontFamily:'inherit',fontSize:13}} />
             <div style={{display:'flex',gap:8,marginTop:12}}>
-              <button onClick={()=>setModal(null)} style={{flex:1,padding:'9px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-              <button onClick={submitRating} style={{flex:1,padding:'9px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>Publier</button>
+              <button onClick={()=>{setModal(null);setEditingRating(null)}} style={{flex:1,padding:'9px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button onClick={submitRating} style={{flex:1,padding:'9px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>{editingRating?'Modifier':'Publier'}</button>
             </div>
           </div>
         </Overlay>
@@ -647,53 +598,40 @@ export default function Home() {
         <Overlay onClose={()=>{setCommentModal(null);setReplyTo(null)}}>
           <div style={{background:'var(--background)',borderRadius:16,padding:'1.5rem',width:360,maxWidth:'90vw',border:'0.5px solid #ddd'}}>
             <div style={{fontSize:16,fontWeight:500,marginBottom:12}}>Commentaires</div>
-            <div style={{background:'#f5f5f5',borderRadius:8,padding:'8px 12px',marginBottom:12}}>
-              <div style={{fontSize:13,fontWeight:500}}>{commentModal.match_teams}</div>
-              <div style={{fontSize:12,color:'#666'}}>{commentModal.match_score} · {'★'.repeat(commentModal.stars)}</div>
+            <div style={{background:'#f0f0f0',borderRadius:8,padding:'8px 12px',marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:500,color:'#222'}}>{commentModal.match_teams}</div>
+              <div style={{fontSize:12,color:'#555'}}>{commentModal.match_score} · {'★'.repeat(commentModal.stars)}</div>
             </div>
             <div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>
-              {getRatingComments(commentModal.id).length===0&&<p style={{fontSize:13,color:'#aaa'}}>Aucun commentaire.</p>}
-              {getRatingComments(commentModal.id).map(c=>(
+              {comments.filter(c=>c.rating_id===commentModal.id&&!c.parent_id).length===0&&<p style={{fontSize:13,color:'#aaa'}}>Aucun commentaire.</p>}
+              {comments.filter(c=>c.rating_id===commentModal.id&&!c.parent_id).map(c=>(
                 <div key={c.id} style={{marginBottom:8,paddingBottom:8,borderBottom:'0.5px solid #eee'}}>
-                  <span style={{fontSize:12,fontWeight:500,color:'#333'}}>@{c.profiles?.username} </span>
-                  <span style={{fontSize:12,color:'#444'}}>{c.content}</span>
-                  <div><button onClick={()=>setReplyTo(c)} style={{fontSize:11,color:'#aaa',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0}}>Répondre</button></div>
-                  {getReplies(c.id).map(reply=>(
+                  <span style={{fontSize:12,fontWeight:500,color:'#222'}}>@{c.profiles?.username} </span>
+                  <span style={{fontSize:12,color:'#333'}}>{c.content}</span>
+                  <div>
+                    <button onMouseDown={()=>setReplyTo(c)} style={{fontSize:11,color:'#888',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0}}>Répondre</button>
+                  </div>
+                  {comments.filter(r=>r.parent_id===c.id).map(reply=>(
                     <div key={reply.id} style={{marginTop:4,paddingLeft:8,borderLeft:'2px solid #eee'}}>
-                      <span style={{fontSize:11,fontWeight:500,color:'#333'}}>@{reply.profiles?.username} </span>
-                      <span style={{fontSize:11,color:'#444'}}>{reply.content}</span>
+                      <span style={{fontSize:11,fontWeight:500,color:'#222'}}>@{reply.profiles?.username} </span>
+                      <span style={{fontSize:11,color:'#333'}}>{reply.content}</span>
                     </div>
                   ))}
                 </div>
               ))}
             </div>
-            {replyTo&&<div style={{fontSize:12,color:'#888',marginBottom:6,padding:'4px 8px',background:'#f5f5f5',borderRadius:6}}>Réponse à @{replyTo.profiles?.username} <button onClick={()=>setReplyTo(null)} style={{marginLeft:8,fontSize:11,color:'#aaa',background:'transparent',border:'none',cursor:'pointer'}}>✕</button></div>}
+            {replyTo&&<div style={{fontSize:12,color:'#555',marginBottom:6,padding:'4px 8px',background:'#f0f0f0',borderRadius:6}}>Réponse à @{replyTo.profiles?.username} <button onMouseDown={()=>setReplyTo(null)} style={{marginLeft:8,fontSize:11,color:'#888',background:'transparent',border:'none',cursor:'pointer'}}>✕</button></div>}
             <div style={{display:'flex',gap:8}}>
-              <input value={commentText} onChange={e=>setCommentText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitComment()} placeholder={replyTo?`Répondre à @${replyTo.profiles?.username}...`:"Ton commentaire..."} style={{flex:1,padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',color:'inherit',fontFamily:'inherit',fontSize:13}} />
-              <button onClick={submitComment} style={{padding:'8px 14px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>↑</button>
-            </div>
-          </div>
-        </Overlay>
-      )}
-
-      {shareModal && (
-        <Overlay onClose={()=>setShareModal(null)}>
-          <div id="share-modal" style={{background:'var(--background)',borderRadius:16,padding:'1.5rem',width:340,maxWidth:'90vw',border:'0.5px solid #ddd'}}>
-            <div style={{fontSize:16,fontWeight:500,marginBottom:12}}>Partager à :</div>
-            {friends.map(f => (
-              <div key={f.friend_id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'0.5px solid #eee'}}>
-                <input type="checkbox" id={`friend-${f.friend_id}`} style={{width:18,height:18}} />
-                <label htmlFor={`friend-${f.friend_id}`} style={{fontSize:14}}>@{f.profiles?.username}</label>
-              </div>
-            ))}
-            <div style={{display:'flex',gap:8,marginTop:16}}>
-              <button onClick={()=>setShareModal(null)} style={{flex:1,padding:'9px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer'}}>Annuler</button>
-              <button onClick={()=>{
-                const checkboxes = document.querySelectorAll('#share-modal input[type="checkbox"]:checked')
-                const selectedIds = Array.from(checkboxes).map(cb => cb.id.replace('friend-', ''))
-                if (selectedIds.length === 0) return
-                sendMatchToMultipleFriends(shareModal, selectedIds)
-              }} style={{flex:1,padding:'9px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer'}}>Partager</button>
+              <input
+                ref={commentInputRef}
+                value={commentText}
+                onChange={e=>setCommentText(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&submitComment()}
+                placeholder={replyTo?`Répondre à @${replyTo.profiles?.username}...`:"Ton commentaire..."}
+                style={{flex:1,padding:'8px 12px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',color:'inherit',fontFamily:'inherit',fontSize:13}}
+                autoFocus
+              />
+              <button onMouseDown={submitComment} style={{padding:'8px 14px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer',fontFamily:'inherit'}}>↑</button>
             </div>
           </div>
         </Overlay>
@@ -703,7 +641,7 @@ export default function Home() {
         <Overlay onClose={()=>setConfirmModal(null)}>
           <div style={{background:'var(--background)',borderRadius:16,padding:'1.5rem',width:300,maxWidth:'90vw',border:'0.5px solid #ddd'}}>
             <div style={{fontSize:16,fontWeight:500,marginBottom:8}}>{confirmModal.title}</div>
-            <div style={{fontSize:13,color:'#666',marginBottom:20,lineHeight:1.5}}>{confirmModal.message}</div>
+            <div style={{fontSize:13,color:'#555',marginBottom:20,lineHeight:1.5}}>{confirmModal.message}</div>
             <div style={{display:'flex',gap:8}}>
               {!confirmModal.single&&<button onClick={()=>setConfirmModal(null)} style={{flex:1,padding:'9px',border:'0.5px solid #ddd',borderRadius:8,background:'transparent',cursor:'pointer',fontFamily:'inherit',fontSize:13}}>Annuler</button>}
               <button onClick={()=>{confirmModal.onConfirm?.();setConfirmModal(null)}} style={{flex:1,padding:'9px',border:'none',borderRadius:8,background:'#000',color:'#fff',cursor:'pointer',fontFamily:'inherit',fontSize:13}}>OK</button>
